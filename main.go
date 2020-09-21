@@ -97,12 +97,14 @@ func main() {
 		for {
 			bytes, _, err := conn.ReadFromUDP(buffer)
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "error reading from UDP connection: %v\n", err)
 				break
 			}
 
 			// write to the tun device
 			_, err = tun.Write(buffer[:bytes])
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "error writing to tun: %v\n", err)
 				break
 			}
 		}
@@ -119,12 +121,14 @@ func main() {
 
 			bytes, err := tun.Read(buffer)
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "error reading from tun: %v\n", err)
 				break
 			}
 
 			// at this point the buffer is a complete UDP packet; let's forward it to our UDP peer
 			_, err = conn.WriteTo(buffer[:bytes], nil)
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "error writing to UDP connection: %v\n", err)
 				break
 			}
 		}

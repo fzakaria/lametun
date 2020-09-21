@@ -3,22 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
+	"golang.org/x/sys/unix"
 	"net"
 	"os"
-	"syscall"
 	"unsafe"
 )
 
 const (
-	// https://elixir.bootlin.com/linux/v5.8.10/source/include/uapi/linux/if.h#L33
-	IFNAMSIZ = 16
 	// sizeof(struct ifreq)
 	IfReqSize = 40
-	// https://github.com/golang/go/blob/50bd1c4d4eb4fac8ddeb5f063c099daccfb71b26/src/syscall/zerrors_linux_amd64.go#L1183
-	TUNSETIFF = 0x400454ca
-	// https://github.com/golang/go/blob/50bd1c4d4eb4fac8ddeb5f063c099daccfb71b26/src/syscall/zerrors_linux_amd64.go#L1183
-	IFF_TUN         = 0x1
-	IfReqFlagOffset = IFNAMSIZ
 )
 
 // let's open the TUN device
@@ -27,7 +20,7 @@ const (
 // This code makes use of some unsafe golang code, this is merely to avoid pulling in
 // dependencies since this is for demonstration
 func openTunDevice(dev string) (*os.File, error) {
-	file, err := os.OpenFile("/dev/net/tun", os.O_RDWR, 0)
+	fd, err := unix.Open("/dev/net/tun", os.O_RDWR, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -37,20 +30,21 @@ func openTunDevice(dev string) (*os.File, error) {
 	// we fill in the required struct members such as the device name & that it is a TUN
 	var ifr [IfReqSize]byte
 	copy(ifr[:], dev)
-	ifr[IfReqFlagOffset] = IFF_TUN
+	*(*uint16)(unsafe.Pointer(&ifr[unix.IFNAMSIZ])) = unix.IFF_TUN
 
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		file.Fd(),
-		uintptr(TUNSETIFF),
+	_, _, errno := unix.Syscall(
+		unix.SYS_IOCTL,
+		uintptr(fd),
+		uintptr(unix.TUNSETIFF),
 		uintptr(unsafe.Pointer(&ifr[0])),
 	)
 
 	if errno != 0 {
-		return nil, errno
+		return nil, fmt.Errorf("error syscall.Ioctl(): %v\n", errno)
 	}
 
-	return file, nil
+	unix.SetNonblock(fd, true)
+	return os.NewFile(uintptr(fd), "/dev/net/tun"), nil
 }
 
 func main() {

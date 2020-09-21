@@ -71,37 +71,35 @@ func main() {
 		panic(err)
 	}
 
-	var conn *net.UDPConn
-	if *listen {
-		conn, err = net.ListenUDP("udp4", &net.UDPAddr{Port: *port})
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", *server, *port))
-		if err != nil {
-			panic(err)
-		}
-		conn, err = net.DialUDP("udp4", nil, raddr)
+	conn, err := net.ListenUDP("udp4", &net.UDPAddr{Port: *port})
+	if err != nil {
+		panic(err)
+	}
+	defer conn.Close()
+
+	var raddr net.Addr
+	quit := make(chan struct{})
+
+	if *server != "" {
+		raddr, err = net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", *server, *port))
 		if err != nil {
 			panic(err)
 		}
 	}
-	defer conn.Close()
 
-	quit := make(chan struct{})
 	go func() {
 		// we make sure to pick a buffer size at least greater than our MTU
 		// 2048 is much larger :)
 		buffer := make([]byte, 2048)
 		for {
-			bytes, _, err := conn.ReadFromUDP(buffer)
+			bytes, addr, err := conn.ReadFromUDP(buffer)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error reading from UDP connection: %v\n", err)
 				break
 			}
 
 			fmt.Printf("Writing %d bytes to the tun device.\n", bytes)
+			raddr = addr
 
 			// write to the tun device
 			_, err = tun.Write(buffer[:bytes])
@@ -129,8 +127,13 @@ func main() {
 
 			fmt.Printf("Read %d bytes from the tun device.\n", bytes)
 
+			if raddr == nil {
+				fmt.Printf("UDP connection to server has not been established yet.\n")
+				continue
+			}
+
 			// at this point the buffer is a complete UDP packet; let's forward it to our UDP peer
-			_, err = conn.WriteTo(buffer[:bytes], nil)
+			_, err = conn.WriteTo(buffer[:bytes], raddr)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error writing to UDP connection: %v\n", err)
 				break

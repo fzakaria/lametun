@@ -78,7 +78,7 @@ func main() {
 			panic(err)
 		}
 	} else {
-		raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", server, port))
+		raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", *server, *port))
 		if err != nil {
 			panic(err)
 		}
@@ -100,6 +100,8 @@ func main() {
 				fmt.Fprintf(os.Stderr, "error reading from UDP connection: %v\n", err)
 				break
 			}
+
+			fmt.Printf("Writing %d bytes to the tun device.\n", bytes)
 
 			// write to the tun device
 			_, err = tun.Write(buffer[:bytes])
@@ -124,6 +126,8 @@ func main() {
 				fmt.Fprintf(os.Stderr, "error reading from tun: %v\n", err)
 				break
 			}
+
+			fmt.Printf("Read %d bytes from the tun device.\n", bytes)
 
 			// at this point the buffer is a complete UDP packet; let's forward it to our UDP peer
 			_, err = conn.WriteTo(buffer[:bytes], nil)

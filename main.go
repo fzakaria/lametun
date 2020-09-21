@@ -54,32 +54,32 @@ func openTunDevice(dev string) (*os.File, error) {
 }
 
 func main() {
-	port := *flag.Int("port", 1234, "The protocol port for lametun")
-	dev := *flag.String("device", "tun0", "The TUN device name")
-	listen := *flag.Bool("listen", false, "Whether to designate this machine as the server")
-	server := *flag.String("server", "", "The server to connect to")
+	port := flag.Int("port", 1234, "The protocol port for lametun")
+	dev := flag.String("device", "tun0", "The TUN device name")
+	listen := flag.Bool("listen", false, "Whether to designate this machine as the server")
+	server := flag.String("server", "", "The server to connect to")
 	flag.Parse()
 
-	if listen && server != "" {
+	fmt.Printf("listen:%v server:%v dev:%v port:%v\n", *listen, *server, *dev, *port)
+
+	if *listen && *server != "" {
 		fmt.Fprintf(os.Stderr, "Cannot listen and set server flag\n")
 		os.Exit(1)
 	}
 
-	if !listen && server == "" {
+	if !*listen && *server == "" {
 		fmt.Fprintf(os.Stderr, "You must specify the server or mark this host to listen\n")
 		os.Exit(1)
 	}
 
-	fmt.Printf("dev:%v port:%v\n", dev, port)
-
-	tun, err := openTunDevice(dev)
+	tun, err := openTunDevice(*dev)
 	if err != nil {
 		panic(err)
 	}
 
 	var conn *net.UDPConn
-	if listen {
-		conn, err = net.ListenUDP("udp4", &net.UDPAddr{Port: port})
+	if *listen {
+		conn, err = net.ListenUDP("udp4", &net.UDPAddr{Port: *port})
 		if err != nil {
 			panic(err)
 		}
